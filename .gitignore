@@ -1,5 +1,19 @@
 __pycache__/
 *.py[cod]
-__pycache__/
-*.py[cod]
 *.class
+
+# 忽略日志文件
+*.log
+
+# 忽略 JSON 数据文件（但保留配置文件）
+*.json
+!package.json
+!tsconfig.json
+!*config*.json
+
+*.sqlite
+*.lock
+*.txt
+*.pkl
+*.jsonl
+*.bak

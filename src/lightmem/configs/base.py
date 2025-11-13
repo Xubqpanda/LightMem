@@ -9,6 +9,8 @@ from lightmem.configs.text_embedder.base import TextEmbedderConfig
 from lightmem.configs.multimodal_embedder.base import MMEmbedderConfig
 from lightmem.configs.retriever.contextretriever.base import ContextRetrieverConfig
 from lightmem.configs.retriever.embeddingretriever.base import EmbeddingRetrieverConfig
+from lightmem.configs.logging.base import LoggingConfig
+from lightmem.configs.graph_manager.base import GraphManagerConfig
 
 lightmem_dir = ""
 
@@ -102,8 +104,16 @@ class BaseMemoryConfigs(BaseModel):
         default=False,
         description="If True, enable topic segmentation; otherwise disable it."
     )
+    graph_manager: Optional[GraphManagerConfig] = Field(
+        default=None,
+        description="Configuration for the offline GraphManager (event graph builder)."
+    )
     version: Optional[str] = Field(
         description="The version of the API",
         default="v1.1",
+    )
+    logging: Optional[LoggingConfig] = Field(
+        default=None,
+        description="Logging configuration for the LightMem system."
     )
 

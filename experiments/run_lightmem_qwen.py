@@ -4,20 +4,31 @@ from tqdm import tqdm
 import datetime
 import time
 import os
+import logging
 from lightmem.memory.lightmem import LightMemory
 
+# Script-level logger (handlers configured by LightMemory logging config).
+script_logger = logging.getLogger("lightmem.experiments.run_lightmem_qwen")
+script_logger.setLevel(logging.INFO)
+
+# ============ logging Configuration ============
+LOGS_ROOT = "./logs"
+RUN_TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+RUN_LOG_DIR = os.path.join(LOGS_ROOT, RUN_TIMESTAMP)
+os.makedirs(RUN_LOG_DIR, exist_ok=True)
+
 # ============ API Configuration ============
-API_KEY='your_api_key_here'
+API_KEY='sk-mYmdqXKCUL9FqNfI27855c29E94d419c995bA6D54c20Af21'
 API_BASE_URL='https://api.gpts.vin/v1'
 LLM_MODEL='qwen3-30b-a3b-instruct-2507'
 JUDGE_MODEL='gpt-4o-mini'
 
 # ============ Model Paths ============
-LLMLINGUA_MODEL_PATH='/your/path/to/models/llmlingua-2-bert-base-multilingual-cased-meetingbank'
-EMBEDDING_MODEL_PATH='/your/path/to/models/all-MiniLM-L6-v2'
+LLMLINGUA_MODEL_PATH='/disk/disk_20T/fangjizhan/models/llmlingua-2-bert-base-multilingual-cased-meetingbank'
+EMBEDDING_MODEL_PATH='/disk/disk_20T/fangjizhan/models/all-MiniLM-L6-v2'
 
 # ============ Data Configuration ============
-DATA_PATH='/your/path/to/dataset/longmemeval/longmemeval_s.json'
+DATA_PATH='/disk/disk_20T/xubuqiang/lightmem/dataset/longmemeval/longmemeval_s_cleaned.json'
 RESULTS_DIR='../results'
 QDRANT_DATA_DIR='./qdrant_data'
 
@@ -122,7 +133,7 @@ def load_lightmem(collection_name):
                 "api_key": API_KEY,
                 "max_tokens": 16000,
                 "openai_base_url": API_BASE_URL
-            }
+            },
         },
         "extract_threshold": 0.1,
         "index_strategy": "embedding",
@@ -144,6 +155,11 @@ def load_lightmem(collection_name):
             }
         },
         "update": "offline",
+        "logging": {
+            "level": "DEBUG",
+            "file_enabled": True,
+            "log_dir": RUN_LOG_DIR,
+        }
     }
     lightmem = LightMemory.from_config(config)
     return lightmem
@@ -152,7 +168,7 @@ llm_judge = LLMModel(JUDGE_MODEL, API_KEY, API_BASE_URL)
 llm = LLMModel(LLM_MODEL, API_KEY, API_BASE_URL)
 
 data = json.load(open(DATA_PATH, "r"))
-data = data[:10]
+data = data[74:75]
 
 INIT_RESULT = {
     "add_input_prompt": [],
@@ -192,39 +208,42 @@ for item in tqdm(data):
 
     time_end = time.time()
     construction_time = time_end - time_start
+    lightmem.construct_update_queue_all_entries()
+    lightmem.offline_update_all_entries(score_threshold=0.8)
+    # related_memories = lightmem.retrieve(item["question"], limit=20)
+    # messages = []
+    # messages.append({"role": "system", "content": "You are a helpful assistant."})
+    # messages.append({
+    #     "role": "user",
+    #     "content": f"Question time:{item['question_date']} and question:{item['question']}\nPlease answer the question based on the following memories: {str(related_memories)}"
+    # })
+    # generated_answer = llm.call(messages)
+    # script_logger.info("[%s] generated_answer=%s", item["question_id"], generated_answer)
+    # if 'abs' in item["question_id"]:
+    #     prompt = get_anscheck_prompt(
+    #         item["question_type"], item["question"], item["answer"], generated_answer, abstention=True
+    #     )
+    # else:
+    #     prompt = get_anscheck_prompt(
+    #         item["question_type"], item["question"], item["answer"], generated_answer
+    #     )
+    # messages = [{"role": "user", "content": prompt}]
+    # response = llm_judge.call(messages)
+    # script_logger.info("[%s] judge_response=%s", item["question_id"], response)
 
-    related_memories = lightmem.retrieve(item["question"], limit=20)
-    messages = []
-    messages.append({"role": "system", "content": "You are a helpful assistant."})
-    messages.append({
-        "role": "user",
-        "content": f"Question time:{item['question_date']} and question:{item['question']}\nPlease answer the question based on the following memories: {str(related_memories)}"
-    })
-    generated_answer = llm.call(messages)
+    # correct = 1 if true_or_false(response) else 0
+    # script_logger.info("[%s] correct=%s", item["question_id"], correct)
 
-    if 'abs' in item["question_id"]:
-        prompt = get_anscheck_prompt(
-            item["question_type"], item["question"], item["answer"], generated_answer, abstention=True
-        )
-    else:
-        prompt = get_anscheck_prompt(
-            item["question_type"], item["question"], item["answer"], generated_answer
-        )
-    messages = [{"role": "user", "content": prompt}]
-    response = llm_judge.call(messages)
+    # save_data = {
+    #     "question_id": item["question_id"],
+    #     "results": results_list,
+    #     "construction_time": construction_time,
+    #     "generated_answer": generated_answer,
+    #     "ground_truth": item["answer"],
+    #     "correct": correct,
+    # }
 
-    correct = 1 if true_or_false(response) else 0
-
-    save_data = {
-        "question_id": item["question_id"],
-        "results": results_list,
-        "construction_time": construction_time,
-        "generated_answer": generated_answer,
-        "ground_truth": item["answer"],
-        "correct": correct,
-    }
-
-    filename = f"../results/result_{item['question_id']}.json"
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(save_data, f, ensure_ascii=False, indent=4)
+    # filename = f"../results/result_{item['question_id']}.json"
+    # os.makedirs(os.path.dirname(filename), exist_ok=True)
+    # with open(filename, "w", encoding="utf-8") as f:
+    #     json.dump(save_data, f, ensure_ascii=False, indent=4)
